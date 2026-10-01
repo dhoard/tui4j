@@ -1,6 +1,7 @@
 package com.williamcallahan.tui4j.compat.bubbletea.render;
 
 import com.williamcallahan.tui4j.ansi.Truncate;
+import com.williamcallahan.tui4j.compat.x.ansi.StringWidth;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +30,7 @@ class RendererFlush {
     private final List<String> queuedMessageLines = new ArrayList<>();
     private volatile boolean needsRender = true;
     private int linesRendered = 0;
+    private int altLinesRendered = 0;
     private volatile boolean isInAltScreen;
 
     /**
@@ -63,25 +65,32 @@ class RendererFlush {
             StringBuilder out = new StringBuilder();
             String[] newLines = splitAndTruncateHeight(height);
 
-            if (linesRendered > 1) {
+            if (isInAltScreen) {
+                out.append("\033[H");
+            } else if (linesRendered > 1) {
                 out.append("\033[").append(linesRendered - 1).append("A");
             }
 
             boolean didFlushQueued = flushQueuedMessages(out, width);
             renderDiffLines(out, newLines, didFlushQueued, width);
 
-            if (linesRendered > newLines.length) {
+            if (lastLinesRendered() > newLines.length) {
                 out.append("\033[J");
             }
 
-            out.append("\r");
+            if (isInAltScreen) {
+                altLinesRendered = newLines.length;
+                out.append("\033[").append(newLines.length).append(";1H");
+            } else {
+                linesRendered = newLines.length;
+                out.append("\r");
+            }
 
             terminal.writer().print(out);
             terminal.writer().flush();
 
             lastRender = buffer.toString();
             lastRenderedLines = newLines;
-            linesRendered = newLines.length;
             needsRender = false;
         } finally {
             renderLock.unlock();
@@ -103,7 +112,7 @@ class RendererFlush {
             return false;
         }
         for (String line : queuedMessageLines) {
-            if (width > 0 && line.length() < width) {
+            if (width > 0 && StringWidth.stringWidth(line) < width) {
                 out.append(line).append("\033[K");
             } else {
                 out.append(line);
@@ -114,7 +123,7 @@ class RendererFlush {
         return true;
     }
 
-    /** Emits only the lines that differ from the previous render, using cursor-down to skip unchanged ones. */
+    /** Emits changed lines and advances past unchanged physical rows without repainting them. */
     private void renderDiffLines(StringBuilder out, String[] newLines, boolean forceRender, int width) {
         for (int i = 0; i < newLines.length; i++) {
             boolean canSkip =
@@ -124,7 +133,7 @@ class RendererFlush {
 
             if (canSkip) {
                 if (i < newLines.length - 1) {
-                    out.append("\033[B");
+                    out.append("\n");
                 }
                 continue;
             }
@@ -135,14 +144,14 @@ class RendererFlush {
                 line = Truncate.truncate(line, width, "");
             }
 
-            if (width > 0 && line.length() < width) {
+            if (width > 0 && StringWidth.stringWidth(line) < width) {
                 out.append("\r").append(line).append("\033[K");
             } else {
                 out.append("\r").append(line);
             }
 
             if (i < newLines.length - 1) {
-                out.append("\n");
+                out.append("\r\n");
             }
         }
     }
@@ -192,6 +201,12 @@ class RendererFlush {
     private void resetRenderState() {
         lastRender = "";
         lastRenderedLines = new String[0];
+        needsRender = true;
+    }
+
+    /** Returns the line count for the active terminal screen. */
+    private int lastLinesRendered() {
+        return isInAltScreen ? altLinesRendered : linesRendered;
     }
 
     /** Marks the renderer as needing a redraw on the next tick (tui4j extension). */
@@ -256,10 +271,9 @@ class RendererFlush {
 
     /** Switches to the alternate screen buffer. Upstream: bubbletea/standard_renderer.go enterAltScreen. */
     void enterAltScreen() {
-        if (isInAltScreen) return;
-
         renderLock.lock();
         try {
+            if (isInAltScreen) return;
             if (terminal.getType().equals("dumb")) return;
 
             terminal.puts(InfoCmp.Capability.enter_ca_mode);
@@ -267,8 +281,8 @@ class RendererFlush {
             terminal.puts(InfoCmp.Capability.cursor_home);
 
             resetRenderState();
-            needsRender = true;
             isInAltScreen = true;
+            altLinesRendered = 0;
 
             terminal.flush();
         } finally {
@@ -278,14 +292,12 @@ class RendererFlush {
 
     /** Returns from the alternate screen buffer. Upstream: bubbletea/standard_renderer.go exitAltScreen. */
     void exitAltScreen() {
-        if (!isInAltScreen) return;
-
         renderLock.lock();
         try {
+            if (!isInAltScreen) return;
             terminal.puts(InfoCmp.Capability.exit_ca_mode);
 
             resetRenderState();
-            needsRender = true;
             isInAltScreen = false;
 
             terminal.flush();
