@@ -31,6 +31,8 @@ class RendererFlush {
     private volatile boolean needsRender = true;
     private int linesRendered = 0;
     private int altLinesRendered = 0;
+    private int lastFlushWidth = -1;
+    private int lastFlushHeight = -1;
     private volatile boolean isInAltScreen;
 
     /**
@@ -45,18 +47,31 @@ class RendererFlush {
     /**
      * Diffs the current buffer against the last render and writes only changed lines.
      * <p>
+     * A cached frame is only valid at the dimensions it was painted with, so a
+     * changed width or height invalidates the cache here rather than relying on
+     * the caller to repaint. Upstream drives this from a repaint message, but the
+     * ticker thread reads its dimensions outside the render lock, so a resize can
+     * slip between a repaint and the flush it was meant to force; without this
+     * check that frame is painted at the old width and then diff-skipped forever.
+     * <p>
      * Upstream: bubbletea/standard_renderer.go flush
      *
      * @param width  terminal width for truncation (0 = unlimited)
      * @param height terminal height for overflow trimming (0 = unlimited)
      */
     void flush(int width, int height) {
-        if (!needsRender) {
-            return;
-        }
-
         renderLock.lock();
         try {
+            if (width != lastFlushWidth || height != lastFlushHeight) {
+                lastFlushWidth = width;
+                lastFlushHeight = height;
+                resetRenderState();
+            }
+
+            if (!needsRender) {
+                return;
+            }
+
             if (queuedMessageLines.isEmpty()
                 && (buffer.isEmpty() || buffer.toString().equals(lastRender))) {
                 return;
@@ -64,6 +79,7 @@ class RendererFlush {
 
             StringBuilder out = new StringBuilder();
             String[] newLines = splitAndTruncateHeight(height);
+            boolean repainted = lastRenderedLines.length == 0;
 
             if (isInAltScreen) {
                 out.append("\033[H");
@@ -74,8 +90,14 @@ class RendererFlush {
             boolean didFlushQueued = flushQueuedMessages(out, width);
             renderDiffLines(out, newLines, didFlushQueued, width);
 
-            if (lastLinesRendered() > newLines.length) {
-                out.append("\033[J");
+            if (needsEraseBelow(repainted, newLines.length)
+                && (height <= 0 || newLines.length < height)) {
+                // Step onto the row below the content and return to column 1
+                // before erasing: erasing from the last row itself wipes a cached
+                // final row that was skipped unchanged (and the last cell of a
+                // full-width row). CUD clamps at the bottom margin instead of
+                // scrolling; CUU restores the origin the next flush assumes.
+                out.append("\033[B\r\033[J\033[A");
             }
 
             if (isInAltScreen) {
@@ -97,9 +119,18 @@ class RendererFlush {
         }
     }
 
-    /** Splits the buffer into lines and trims overflow beyond the given height. */
+    /**
+     * Splits the buffer into lines and trims overflow beyond the given height.
+     * <p>
+     * Splits with a negative limit because Java drops trailing empty strings,
+     * while upstream {@code strings.Split} keeps them: a view ending in a
+     * newline owns a real final blank row, and dropping it makes the cached line
+     * count and the physical rows disagree.
+     * <p>
+     * Upstream: bubbletea/standard_renderer.go flush (strings.Split)
+     */
     private String[] splitAndTruncateHeight(int height) {
-        String[] newLines = buffer.toString().split("\n");
+        String[] newLines = buffer.toString().split("\n", -1);
         if (height > 0 && newLines.length > height) {
             newLines = Arrays.copyOfRange(newLines, newLines.length - height, newLines.length);
         }
@@ -209,6 +240,26 @@ class RendererFlush {
         return isInAltScreen ? altLinesRendered : linesRendered;
     }
 
+    /**
+     * Reports whether rows below the painted content must be erased this flush.
+     * <p>
+     * A repaint in the alternate screen must clear everything under the view,
+     * because the terminal may have reflowed previous content into those rows on
+     * resize; the renderer owns the whole alternate screen. The normal screen
+     * only erases leftovers below a previously taller view, matching upstream,
+     * so it never clears terminal content the program does not own.
+     *
+     * @param repainted whether the render cache was empty (repaint, clear, resize, or screen transition)
+     * @param visibleLines lines painted by this flush
+     * @return {@code true} when the area below the content should be cleared
+     */
+    private boolean needsEraseBelow(boolean repainted, int visibleLines) {
+        if (isInAltScreen) {
+            return repainted || lastLinesRendered() > visibleLines;
+        }
+        return lastLinesRendered() > visibleLines;
+    }
+
     /** Marks the renderer as needing a redraw on the next tick (tui4j extension). */
     void notifyModelChanged() {
         this.needsRender = true;
@@ -226,7 +277,7 @@ class RendererFlush {
             if (isInAltScreen) {
                 return;
             }
-            String[] lines = messageBody.split("\n");
+            String[] lines = messageBody.split("\n", -1);
             queuedMessageLines.addAll(Arrays.asList(lines));
             needsRender = true;
             resetRenderState();
