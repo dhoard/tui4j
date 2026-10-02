@@ -13,7 +13,10 @@ class RendererUnicodeWidthDriftTest {
 
     /**
      * Keeps changing status and footer rows in place when a terminal expands a
-     * joined emoji into the widths of its component code points.
+     * joined emoji into the widths of its component code points. The emoji row
+     * itself changes each frame, so the second flush repaints it while the row
+     * beneath it stays diff-skipped: width drift that escaped the emoji row would
+     * corrupt a physical row that is never rewritten.
      */
     @Test
     void joinedEmojiCannotDisplaceNeighboringRows() {
@@ -27,7 +30,7 @@ class RendererUnicodeWidthDriftTest {
 
         for (int frame = 0; frame < 2; frame++) {
             String view = String.join("\n",
-                pad("family 👨‍👩‍👧‍👦 transcript", width),
+                pad("family " + frame + " 👨‍👩‍👧‍👦 transcript", width),
                 pad("second transcript", width),
                 pad("Working " + frame, width),
                 " ".repeat(width),
@@ -41,7 +44,7 @@ class RendererUnicodeWidthDriftTest {
             screen.apply(terminal.drain());
         }
 
-        assertThat(screen.line(0)).startsWith("family");
+        assertThat(screen.line(0)).startsWith("family 1");
         assertThat(screen.line(1)).startsWith("second transcript");
         assertThat(screen.line(2)).startsWith("Working 1");
         assertThat(screen.line(3)).isBlank();
