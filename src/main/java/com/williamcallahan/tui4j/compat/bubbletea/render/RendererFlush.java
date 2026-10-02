@@ -22,6 +22,9 @@ import org.jline.utils.InfoCmp;
  */
 class RendererFlush {
 
+    private static final String DISABLE_AUTO_WRAP = "\033[?7l";
+    private static final String ENABLE_AUTO_WRAP = "\033[?7h";
+
     private final Terminal terminal;
     private final Lock renderLock = new ReentrantLock();
     private final StringBuilder buffer = new StringBuilder();
@@ -82,7 +85,7 @@ class RendererFlush {
             boolean repainted = lastRenderedLines.length == 0;
 
             if (isInAltScreen) {
-                out.append("\033[H");
+                out.append(DISABLE_AUTO_WRAP);
             } else if (linesRendered > 1) {
                 out.append("\033[").append(linesRendered - 1).append("A");
             }
@@ -92,17 +95,23 @@ class RendererFlush {
 
             if (needsEraseBelow(repainted, newLines.length)
                 && (height <= 0 || newLines.length < height)) {
-                // Step onto the row below the content and return to column 1
-                // before erasing: erasing from the last row itself wipes a cached
-                // final row that was skipped unchanged (and the last cell of a
-                // full-width row). CUD clamps at the bottom margin instead of
-                // scrolling; CUU restores the origin the next flush assumes.
-                out.append("\033[B\r\033[J\033[A");
+                if (isInAltScreen) {
+                    appendCursorPosition(out, newLines.length + 1);
+                    out.append("\033[J");
+                } else {
+                    // Step onto the row below the content and return to column 1
+                    // before erasing: erasing from the last row itself wipes a cached
+                    // final row that was skipped unchanged (and the last cell of a
+                    // full-width row). CUD clamps at the bottom margin instead of
+                    // scrolling; CUU restores the origin the next flush assumes.
+                    out.append("\033[B\r\033[J\033[A");
+                }
             }
 
             if (isInAltScreen) {
                 altLinesRendered = newLines.length;
-                out.append("\033[").append(newLines.length).append(";1H");
+                out.append(ENABLE_AUTO_WRAP);
+                appendCursorPosition(out, newLines.length);
             } else {
                 linesRendered = newLines.length;
                 out.append("\r");
@@ -154,7 +163,17 @@ class RendererFlush {
         return true;
     }
 
-    /** Emits changed lines and advances past unchanged physical rows without repainting them. */
+    /**
+     * Emits changed lines without repainting unchanged physical rows.
+     * <p>
+     * Alternate-screen rows use absolute positions rather than line feeds. A
+     * terminal may assign a different width to a joined Unicode sequence than
+     * the grapheme contract used to build the view. Absolute positioning plus
+     * disabled autowrap keeps that disagreement inside its owning row; clearing
+     * first also removes a stale suffix when the terminal renders it narrower.
+     * Current upstream uses absolute coordinates for fullscreen rendering in
+     * {@code bubbletea/cursed_renderer.go}.
+     */
     private void renderDiffLines(StringBuilder out, String[] newLines, boolean forceRender, int width) {
         for (int i = 0; i < newLines.length; i++) {
             boolean canSkip =
@@ -163,7 +182,7 @@ class RendererFlush {
                 newLines[i].equals(lastRenderedLines[i]);
 
             if (canSkip) {
-                if (i < newLines.length - 1) {
+                if (!isInAltScreen && i < newLines.length - 1) {
                     out.append("\n");
                 }
                 continue;
@@ -175,16 +194,24 @@ class RendererFlush {
                 line = Truncate.truncate(line, width, "");
             }
 
-            if (width > 0 && StringWidth.stringWidth(line) < width) {
+            if (isInAltScreen) {
+                appendCursorPosition(out, i + 1);
+                out.append("\033[K").append(line);
+            } else if (width > 0 && StringWidth.stringWidth(line) < width) {
                 out.append("\r").append(line).append("\033[K");
             } else {
                 out.append("\r").append(line);
             }
 
-            if (i < newLines.length - 1) {
+            if (!isInAltScreen && i < newLines.length - 1) {
                 out.append("\r\n");
             }
         }
+    }
+
+    /** Appends a one-based alternate-screen cursor position at column one. */
+    private static void appendCursorPosition(StringBuilder out, int row) {
+        out.append("\033[").append(row).append(";1H");
     }
 
     /**

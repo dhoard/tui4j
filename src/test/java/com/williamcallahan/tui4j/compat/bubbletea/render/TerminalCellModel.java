@@ -18,6 +18,7 @@ final class TerminalCellModel {
     private int row;
     private int column;
     private boolean wrapPending;
+    private boolean autoWrap = true;
 
     /**
      * Creates a blank terminal screen.
@@ -183,8 +184,10 @@ final class TerminalCellModel {
             case 'H', 'f' -> positionCursor(parameters);
             case 'J' -> eraseScreenBelow();
             case 'K' -> eraseLineRight();
+            case 'h' -> setPrivateMode(parameters, true);
+            case 'l' -> setPrivateMode(parameters, false);
             default -> {
-                // SGR and private-mode sequences do not alter cells or cursor position.
+                // SGR and unsupported private modes do not alter modeled cells or cursor position.
             }
         }
         return finalOffset + 1;
@@ -202,6 +205,16 @@ final class TerminalCellModel {
         int separator = parameters.indexOf(';');
         String first = separator < 0 ? parameters : parameters.substring(0, separator);
         return first.isEmpty() ? defaultValue : Integer.parseInt(first);
+    }
+
+    /**
+     * Applies a DEC private mode used by the renderer.
+     *
+     * @param parameters CSI private-mode parameters
+     * @param enabled whether the mode is being set or reset
+     */
+    private void setPrivateMode(String parameters, boolean enabled) {
+        if ("?7".equals(parameters)) autoWrap = enabled;
     }
 
     /**
@@ -249,8 +262,12 @@ final class TerminalCellModel {
      */
     private void writeCodePoint(int codePoint) {
         if (wrapPending) {
-            column = 0;
-            lineFeed();
+            if (autoWrap) {
+                column = 0;
+                lineFeed();
+            } else {
+                wrapPending = false;
+            }
         }
         int displayWidth = StringWidth.stringWidth(new String(Character.toChars(codePoint)));
         if (displayWidth == 0) return;
@@ -260,7 +277,7 @@ final class TerminalCellModel {
         }
         if (column + displayWidth >= width) {
             column = width - 1;
-            wrapPending = true;
+            wrapPending = autoWrap;
             touchedRightMargin[row] = true;
         } else {
             column += displayWidth;
