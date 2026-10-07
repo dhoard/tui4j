@@ -1,5 +1,8 @@
 package com.williamcallahan.tui4j.compat.bubbles.spinner;
 
+import com.williamcallahan.tui4j.compat.lipgloss.color.NoColor;
+import com.williamcallahan.tui4j.term.TerminalInfo;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -10,6 +13,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Port of github.com/charmbracelet/bubbles/spinner/spinner_test.go.
  */
 class SpinnerTest {
+
+    /**
+     * Registers terminal info so rendering tests do not depend on another test
+     * class having initialized the shared provider first.
+     */
+    @BeforeEach
+    void setUp() {
+        TerminalInfo.provide(() -> new TerminalInfo(false, new NoColor()));
+    }
 
     @Test
     void testSpinnerTypes() {
