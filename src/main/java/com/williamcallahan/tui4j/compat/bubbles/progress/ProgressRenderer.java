@@ -5,6 +5,10 @@ import com.williamcallahan.tui4j.compat.lipgloss.Renderer;
 import com.williamcallahan.tui4j.compat.lipgloss.Style;
 import com.williamcallahan.tui4j.compat.lipgloss.color.ColorProfile;
 import com.williamcallahan.tui4j.compat.lipgloss.color.RGB;
+import com.williamcallahan.tui4j.compat.lipgloss.color.TerminalColor;
+import org.jline.utils.AttributedCharSequence.ForceMode;
+import org.jline.utils.AttributedString;
+import org.jline.utils.AttributedStyle;
 
 /**
  * Rendering and color logic for {@link Progress}.
@@ -118,27 +122,24 @@ final class ProgressRenderer {
         return TextWidth.measureCellWidth(s);
     }
 
+    /**
+     * Styles a bar cell with the given color through the shared profile
+     * conversion and ANSI serialization, so every profile emits the sequences
+     * it supports (a 16-color terminal must not receive 256-color codes).
+     *
+     * @param text cell text to color
+     * @param color color string, hex or ANSI palette index
+     * @return colored cell text
+     */
     private String colorize(String text, String color) {
         ColorProfile profile = getColorProfile();
         if (profile == null || profile == ColorProfile.Ascii) {
             return text;
         }
-        return "\033[" + getANSIColorCode(color, profile) + "m" + text + "\033[0m";
-    }
 
-    private String getANSIColorCode(String color, ColorProfile profile) {
-        RGB rgb = parseColor(color);
-
-        if (profile == ColorProfile.TrueColor) {
-            int r = Math.round(rgb.r() * 255.0f);
-            int g = Math.round(rgb.g() * 255.0f);
-            int b = Math.round(rgb.b() * 255.0f);
-            return "38;2;" + r + ";" + g + ";" + b;
-        }
-
-        // Use the canonical RGB quantization so a color string renders as the
-        // same palette entry everywhere in the library.
-        return "38;5;" + rgb.toANSI256Color().value();
+        TerminalColor terminalColor = profile.color(color);
+        AttributedStyle style = terminalColor.applyAsForeground(new AttributedStyle(), Renderer.defaultRenderer());
+        return new AttributedString(text, style).toAnsi(profile.colorsCount(), ForceMode.None);
     }
 
     private ColorProfile getColorProfile() {

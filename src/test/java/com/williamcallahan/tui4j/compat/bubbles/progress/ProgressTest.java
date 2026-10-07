@@ -232,6 +232,24 @@ class ProgressTest {
     }
 
     /**
+     * A 16-color terminal must receive 16-color escapes, not the 256-color
+     * approximation the bar used to emit regardless of the profile.
+     */
+    @Test
+    void testAnsiProfileEmitsAnsiColorEscapes() {
+        Progress progress = new Progress().withWidth(3).withoutPercentage();
+        progress.setColorProfile(ColorProfile.ANSI);
+
+        String filled = progress.viewAs(1.0);
+        assertThat(filled).contains("\033[94m");
+        assertThat(filled).doesNotContain("38;5;");
+
+        String empty = progress.viewAs(0.0);
+        assertThat(empty).contains("\033[90m");
+        assertThat(empty).doesNotContain("38;5;");
+    }
+
+    /**
      * A 256-color terminal must show the palette entry the rest of the library
      * derives for the same color string, not a second quantization.
      */
