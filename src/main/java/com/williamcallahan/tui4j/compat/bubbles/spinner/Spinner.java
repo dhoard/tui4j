@@ -103,6 +103,12 @@ public class Spinner implements Model {
         return new TickMessage(LocalDateTime.now(), tag, id);
     }
 
+    /**
+     * Allocates the next process-wide spinner identifier, so every spinner instance
+     * receives a distinct id that scopes tick messages to its own producer.
+     *
+     * @return unique spinner id
+     */
     private static int nextId() {
         return LAST_ID.incrementAndGet();
     }

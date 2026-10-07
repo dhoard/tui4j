@@ -160,6 +160,12 @@ public class Cursor implements Model {
         return new InitialBlinkMessage();
     }
 
+    /**
+     * Allocates the next process-wide cursor identifier, so every cursor instance
+     * receives a distinct id that scopes blink messages to its own producer.
+     *
+     * @return unique cursor id
+     */
     private static int nextId() {
         return LAST_ID.incrementAndGet();
     }

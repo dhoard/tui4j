@@ -44,6 +44,10 @@ class SpinnerTest {
         assertThat(spinner.view()).isEqualTo("|");
     }
 
+    /**
+     * Two spinners sit on the same tick tag, so only the per-instance id can tell
+     * them apart; a tick produced by one spinner must not advance the other.
+     */
     @Test
     void testTickMessageIsScopedToItsOwningSpinner() {
         Spinner owner = new Spinner(SpinnerType.DOT);

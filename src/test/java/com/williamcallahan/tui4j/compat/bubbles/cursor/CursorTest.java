@@ -35,6 +35,10 @@ class CursorTest {
         assertThat(secondBlink.tag()).isEqualTo(2);
     }
 
+    /**
+     * Two cursors sit on the same blink tag, so only the per-instance id can tell
+     * them apart; a blink produced by one cursor must not advance the other.
+     */
     @Test
     void testBlinkMessageIsScopedToItsOwningCursor() {
         Cursor owner = new Cursor();
