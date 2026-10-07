@@ -128,16 +128,17 @@ final class ProgressRenderer {
 
     private String getANSIColorCode(String color, ColorProfile profile) {
         RGB rgb = parseColor(color);
-        int r = Math.round(rgb.r() * 255.0f);
-        int g = Math.round(rgb.g() * 255.0f);
-        int b = Math.round(rgb.b() * 255.0f);
 
         if (profile == ColorProfile.TrueColor) {
+            int r = Math.round(rgb.r() * 255.0f);
+            int g = Math.round(rgb.g() * 255.0f);
+            int b = Math.round(rgb.b() * 255.0f);
             return "38;2;" + r + ";" + g + ";" + b;
-        } else {
-            int ansi256 = rgbToANSI256(r, g, b);
-            return "38;5;" + ansi256;
         }
+
+        // Use the canonical RGB quantization so a color string renders as the
+        // same palette entry everywhere in the library.
+        return "38;5;" + rgb.toANSI256Color().value();
     }
 
     private ColorProfile getColorProfile() {
@@ -167,27 +168,5 @@ final class ProgressRenderer {
         int g = Math.round(rgb.g() * 255.0f);
         int b = Math.round(rgb.b() * 255.0f);
         return String.format("#%02x%02x%02x", r, g, b);
-    }
-
-    private static int rgbToANSI256(int r, int g, int b) {
-        if (r == g && g == b) {
-            if (r < 8) {
-                return 16;
-            }
-            if (r > 248) {
-                return 231;
-            }
-            return (int) Math.round(((double) r - 8) / 247 * 24) + 232;
-        }
-
-        int rIdx = Math.round((float) r / 255 * 5);
-        int gIdx = Math.round((float) g / 255 * 5);
-        int bIdx = Math.round((float) b / 255 * 5);
-
-        rIdx = Math.clamp(rIdx, 0, 5);
-        gIdx = Math.clamp(gIdx, 0, 5);
-        bIdx = Math.clamp(bIdx, 0, 5);
-
-        return 16 + 36 * rIdx + 6 * gIdx + bIdx;
     }
 }

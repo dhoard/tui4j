@@ -3,11 +3,24 @@ package com.williamcallahan.tui4j.compat.bubbles.progress;
 import com.williamcallahan.tui4j.compat.bubbletea.Command;
 import com.williamcallahan.tui4j.compat.bubbletea.UpdateResult;
 import com.williamcallahan.tui4j.compat.lipgloss.color.ColorProfile;
+import com.williamcallahan.tui4j.compat.lipgloss.color.NoColor;
+import com.williamcallahan.tui4j.compat.lipgloss.color.RGB;
+import com.williamcallahan.tui4j.term.TerminalInfo;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ProgressTest {
+
+    /**
+     * Registers terminal info so rendering tests do not depend on another test
+     * class having initialized the shared provider first.
+     */
+    @BeforeEach
+    void setUp() {
+        TerminalInfo.provide(() -> new TerminalInfo(false, new NoColor()));
+    }
 
     @Test
     void testDefaultValues() {
@@ -216,6 +229,21 @@ class ProgressTest {
         String view = progress.viewAs(0.5);
 
         assertThat(view).contains("50%");
+    }
+
+    /**
+     * A 256-color terminal must show the palette entry the rest of the library
+     * derives for the same color string, not a second quantization.
+     */
+    @Test
+    void testAnsi256ColorsUseCanonicalQuantization() {
+        Progress progress = new Progress().withWidth(10).withoutPercentage();
+        progress.setColorProfile(ColorProfile.ANSI256);
+
+        assertThat(progress.viewAs(1.0))
+                .contains("\033[38;5;" + RGB.fromHexString("#7571F9").toANSI256Color().value() + "m");
+        assertThat(progress.viewAs(0.0))
+                .contains("\033[38;5;" + RGB.fromHexString("#606060").toANSI256Color().value() + "m");
     }
 
     @Test
