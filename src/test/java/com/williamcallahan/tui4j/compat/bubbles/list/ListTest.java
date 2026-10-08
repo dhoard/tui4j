@@ -142,6 +142,24 @@ class ListTest {
     }
 
     @Test
+    void testTitleViewDoesNotRenderSpinnerWhileFiltering() {
+        // Upstream's titleView draws the left-aligned spinner only inside the title
+        // branch, so an in-flight spinner never shifts the shown filter input
+        // (bubbles/list titleView).
+        List withSpinner = createList(new TestItem("foo"), new TestItem("bar"));
+        List withoutSpinner = createList(new TestItem("foo"), new TestItem("bar"));
+
+        applyCommand(withSpinner, withSpinner.setFilterState(FilterState.Filtering));
+        applyCommand(withoutSpinner, withoutSpinner.setFilterState(FilterState.Filtering));
+
+        // A filter fetch keeps the spinner running while the input is shown.
+        withSpinner.startSpinner();
+
+        assertThat(ListViewRenderer.titleView(withSpinner))
+                .isEqualTo(ListViewRenderer.titleView(withoutSpinner));
+    }
+
+    @Test
     void testEmptyResultsStayOnSinglePageWithPaginationDisabled() {
         ListDataSource dataSource = (page, perPage, filterValue) ->
             new FetchedItems(java.util.List.of(), 0, 0, 0);
