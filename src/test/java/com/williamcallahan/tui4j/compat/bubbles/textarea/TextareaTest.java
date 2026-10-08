@@ -379,6 +379,83 @@ class TextareaTest {
     }
 
     /**
+     * Moving down from a line of double-width runes must keep the cursor on the
+     * same visual column.
+     * <p>
+     * Port of {@code TestVerticalNavigationKeepsCursorHorizontalPosition} from
+     * {@code bubbles/textarea/textarea_test.go}.
+     */
+    @Test
+    void testVerticalNavigationKeepsCursorHorizontalPosition() {
+        Textarea textarea = new Textarea();
+        textarea.setWidth(20);
+        textarea.focus();
+        textarea.setValue("你好你好\nHello");
+        press(textarea, KeyType.KeyCtrlHome);
+        press(textarea, KeyType.KeyRight);
+        press(textarea, KeyType.KeyRight);
+
+        assertEquals(4, textarea.lineInfo().charOffset(), "Cursor should be on the fourth cell of the first line");
+        assertEquals(2, textarea.lineInfo().columnOffset(), "Cursor should be after two double width runes");
+
+        press(textarea, KeyType.KeyDown);
+
+        assertEquals(1, textarea.line(), "Cursor should be on the second line");
+        assertEquals(4, textarea.lineInfo().charOffset(), "Cursor should keep its visual column");
+        assertEquals(4, textarea.lineInfo().columnOffset(), "Cursor should be after four characters of the second line");
+    }
+
+    /**
+     * Vertical traversal must remember the horizontal position and forget it when
+     * the cursor moves sideways.
+     * <p>
+     * Port of {@code TestVerticalNavigationShouldRememberPositionWhileTraversing}
+     * from {@code bubbles/textarea/textarea_test.go}.
+     */
+    @Test
+    void testVerticalNavigationShouldRememberPositionWhileTraversing() {
+        Textarea textarea = new Textarea();
+        textarea.setWidth(40);
+        textarea.focus();
+        textarea.setValue(String.join("\n", "Hello", "World", "This is a long line."));
+
+        assertEquals(2, textarea.line(), "Cursor should start on the last line");
+        assertEquals(20, textarea.lineInfo().columnOffset(), "Cursor should be at the end of the last line");
+
+        press(textarea, KeyType.KeyUp);
+        assertEquals(1, textarea.line(), "Cursor should move to the second line");
+        assertEquals(5, textarea.lineInfo().columnOffset(), "Cursor should be at the end of the second line");
+
+        press(textarea, KeyType.KeyUp);
+        assertEquals(0, textarea.line(), "Cursor should move to the first line");
+        assertEquals(5, textarea.lineInfo().columnOffset(), "Cursor should be at the end of the first line");
+
+        press(textarea, KeyType.KeyDown);
+        press(textarea, KeyType.KeyDown);
+        assertEquals(2, textarea.line(), "Cursor should return to the last line");
+        assertEquals(20, textarea.lineInfo().columnOffset(), "Cursor should restore the remembered position");
+
+        press(textarea, KeyType.KeyUp);
+        press(textarea, KeyType.KeyLeft);
+        assertEquals(1, textarea.line(), "Cursor should be on the second line");
+        assertEquals(4, textarea.lineInfo().columnOffset(), "Moving left should move one character back");
+
+        press(textarea, KeyType.KeyDown);
+        assertEquals(2, textarea.line(), "Cursor should be on the last line");
+        assertEquals(4, textarea.lineInfo().columnOffset(), "Moving sideways should forget the remembered position");
+    }
+
+    /**
+     * Sends a key press to the text area.
+     *
+     * @param textarea text area to update
+     * @param keyType key to press
+     */
+    private static void press(Textarea textarea, KeyType keyType) {
+        textarea.update(new KeyPressMessage(new Key(keyType)));
+    }
+
+    /**
      * Sends a string to the text area one code point at a time, as the input
      * handler delivers rune key presses.
      *
