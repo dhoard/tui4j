@@ -44,16 +44,30 @@ public class Spring {
 
     private final double frequency;
     private final double damping;
+    private final double deltaTime;
 
     /**
-     * Creates Spring to keep this component ready for use.
+     * Creates Spring to keep this component ready for use, stepping at the
+     * default 60 frames per second.
      *
      * @param frequency frequency
      * @param damping damping
      */
     public Spring(double frequency, double damping) {
+        this(frequency, damping, 1.0 / FPS);
+    }
+
+    /**
+     * Creates Spring with an explicit integration step.
+     *
+     * @param frequency frequency
+     * @param damping damping
+     * @param deltaTime seconds advanced per update
+     */
+    private Spring(double frequency, double damping, double deltaTime) {
         this.frequency = frequency;
         this.damping = damping;
+        this.deltaTime = deltaTime;
     }
 
     /**
@@ -69,7 +83,7 @@ public class Spring {
         double velocity,
         double target
     ) {
-        double dt = 1.0 / FPS;
+        double dt = deltaTime;
 
         double displacement = position - target;
         double springForce = -frequency * frequency * displacement;
@@ -86,12 +100,13 @@ public class Spring {
     /**
      * Creates a spring using the legacy FPS signature.
      *
-     * @param fps frames per second
+     * @param fps frames per second; one update advances the simulation by
+     *            {@code 1 / fps} seconds
      * @param frequency spring frequency
      * @param damping spring damping
      * @return spring instance
      */
     public static Spring withFPS(double fps, double frequency, double damping) {
-        return new Spring(frequency, damping);
+        return new Spring(frequency, damping, 1.0 / fps);
     }
 }
