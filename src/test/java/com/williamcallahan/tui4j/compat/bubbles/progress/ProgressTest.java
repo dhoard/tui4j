@@ -270,4 +270,60 @@ class ProgressTest {
         progress.setWidth(60);
         assertThat(progress.width()).isEqualTo(60);
     }
+
+    /**
+     * Gradient cells must follow upstream's CIELUV blend, not an sRGB one.
+     * <p>
+     * Expected cells are {@code go-colorful.Color.BlendLuv} rounded to bytes, the
+     * colors bubbles interpolates for the ramp; an sRGB interpolation would put
+     * olive {@code 128,128,0} in the middle of a red-to-green ramp. A cell can be
+     * one byte above upstream's terminal sequence because termenv truncates the
+     * channel after a hex round trip ({@code 164/255*255} is {@code 163.99…}) while
+     * this port emits the parsed hex value.
+     */
+    @Test
+    void testGradientBlendsInCieluv() {
+        Progress progress = new Progress().withoutPercentage().withWidth(5)
+                .withGradient("#FF0000", "#00FF00");
+        progress.setColorProfile(ColorProfile.TrueColor);
+
+        assertThat(cellColors(progress.viewAs(1.0))).containsExactly(
+                "38;2;255;0;0", "38;2;243;110;0", "38;2;218;164;0", "38;2;172;211;0", "38;2;0;255;0");
+    }
+
+    /**
+     * A full bar stretches the ramp across the whole bar while a half-full one
+     * only stretches it across the filled cells when the ramp is scaled.
+     */
+    @Test
+    void testGradientScalesToTheFilledCells() {
+        Progress plain = new Progress().withoutPercentage().withWidth(10)
+                .withGradient("#FF0000", "#00FF00");
+        Progress scaled = new Progress().withoutPercentage().withWidth(10)
+                .withScaledGradient("#FF0000", "#00FF00");
+        plain.setColorProfile(ColorProfile.TrueColor);
+        scaled.setColorProfile(ColorProfile.TrueColor);
+
+        assertThat(cellColors(plain.viewAs(0.5))).startsWith(
+                "38;2;255;0;0", "38;2;251;71;0", "38;2;245;103;0", "38;2;236;130;0", "38;2;225;153;0");
+        assertThat(cellColors(scaled.viewAs(0.5))).startsWith(
+                "38;2;255;0;0", "38;2;243;110;0", "38;2;218;164;0", "38;2;172;211;0", "38;2;0;255;0");
+    }
+
+    /**
+     * Extracts the truecolor escape sequences of a rendered bar.
+     *
+     * @param view rendered progress bar
+     * @return escape sequence prefixes in cell order
+     */
+    private static java.util.List<String> cellColors(String view) {
+        java.util.List<String> colors = new java.util.ArrayList<>();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("38;2;\\d+;\\d+;\\d+")
+                .matcher(view);
+        while (matcher.find()) {
+            colors.add(matcher.group());
+        }
+        return colors;
+    }
 }

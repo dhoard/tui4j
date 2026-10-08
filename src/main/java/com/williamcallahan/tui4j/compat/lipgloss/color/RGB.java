@@ -161,6 +161,23 @@ public record RGB(float r, float g, float b) {
     }
 
     /**
+     * Blends this color towards another in the CIELUV color space.
+     * <p>
+     * Upstream: {@code lucasb-eyer/go-colorful} v1.2.0 {@code Color.BlendLuv},
+     * which bubbles {@code progress} uses to interpolate gradient colors. A
+     * plain sRGB interpolation passes through different colors (for example
+     * halfway between red and green it produces olive instead of the
+     * perceptual blend).
+     *
+     * @param other color at the end of the ramp
+     * @param t interpolation factor, zero for this color and one for {@code other}
+     * @return blended color
+     */
+    public RGB blendLuv(RGB other, double t) {
+        return Luv.blend(this, other, t);
+    }
+
+    /**
      * Returns a color apply strategy for this RGB value.
      *
      * @return color apply strategy

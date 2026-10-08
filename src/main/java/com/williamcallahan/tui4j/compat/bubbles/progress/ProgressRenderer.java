@@ -157,17 +157,24 @@ final class ProgressRenderer {
     }
 
     private static RGB blend(RGB a, RGB b, double t) {
-        return new RGB(
-                (float) (a.r() + (b.r() - a.r()) * t),
-                (float) (a.g() + (b.g() - a.g()) * t),
-                (float) (a.b() + (b.b() - a.b()) * t)
-        );
+        return a.blendLuv(b, t);
     }
 
     private static String rgbToHex(RGB rgb) {
-        int r = Math.round(rgb.r() * 255.0f);
-        int g = Math.round(rgb.g() * 255.0f);
-        int b = Math.round(rgb.b() * 255.0f);
-        return String.format("#%02x%02x%02x", r, g, b);
+        return String.format("#%02x%02x%02x", channel(rgb.r()), channel(rgb.g()), channel(rgb.b()));
+    }
+
+    /**
+     * Rounds an sRGB channel to a byte.
+     * <p>
+     * Matches upstream {@code colorful.Color.Hex}, which adds a half and casts to
+     * a byte, so an out-of-gamut blend (CIELUV does not preserve the RGB gamut)
+     * wraps instead of producing an unparseable hex color.
+     *
+     * @param value channel value
+     * @return byte value
+     */
+    private static int channel(float value) {
+        return ((int) (value * 255.0 + 0.5)) & 0xFF;
     }
 }
