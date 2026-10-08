@@ -94,7 +94,7 @@ final class ListViewRenderer {
 
             view.append(styles.title().render(list.title));
             if (list.filterState != FilterState.Filtering) {
-                view.append(" ").append(list.statusMessage);
+                view.append("  ").append(list.statusMessage);
                 view = new StringBuilder(
                     Truncate.truncate(
                         view.toString(),

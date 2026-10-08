@@ -160,6 +160,19 @@ class ListTest {
     }
 
     @Test
+    void testTitleViewSeparatesTheStatusMessageFromTheTitle() {
+        // Upstream renders the title, two spaces, then the status message
+        // (bubbles/list titleView), so the two never run together.
+        List list = new List(new Item[]{new TestItem("foo")}, new TestDelegate(), 40, 10);
+        applyCommand(list, list.init());
+        list.newStatusMessage("hello");
+
+        String titleLine = ListViewRenderer.titleView(list).split("\n", -1)[0];
+
+        assertThat(titleLine).isEqualTo("   List   hello");
+    }
+
+    @Test
     void testEmptyResultsStayOnSinglePageWithPaginationDisabled() {
         ListDataSource dataSource = (page, perPage, filterValue) ->
             new FetchedItems(java.util.List.of(), 0, 0, 0);
