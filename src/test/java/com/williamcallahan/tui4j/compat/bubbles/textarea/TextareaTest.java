@@ -5,6 +5,9 @@ import com.williamcallahan.tui4j.compat.lipgloss.Style;
 import com.williamcallahan.tui4j.compat.lipgloss.color.ColorProfile;
 import com.williamcallahan.tui4j.compat.lipgloss.color.NoColor;
 import com.williamcallahan.tui4j.compat.bubbles.cursor.CursorMode;
+import com.williamcallahan.tui4j.compat.bubbletea.KeyPressMessage;
+import com.williamcallahan.tui4j.compat.bubbletea.input.key.Key;
+import com.williamcallahan.tui4j.compat.bubbletea.input.key.KeyType;
 import com.williamcallahan.tui4j.term.TerminalInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -310,5 +313,84 @@ class TextareaTest {
 
         assertNotNull(keyMap.characterForward(), "characterForward binding should not be null");
         assertNotNull(keyMap.characterBackward(), "characterBackward binding should not be null");
+    }
+
+    /**
+     * Typing a long line that soft-wraps must not corrupt the stored value.
+     * <p>
+     * Port of {@code TestValueSoftWrap} from {@code bubbles/textarea/textarea_test.go}.
+     */
+    @Test
+    void testValueSoftWrap() {
+        Textarea textarea = new Textarea();
+        textarea.setWidth(16);
+        textarea.setHeight(10);
+        textarea.setCharLimit(500);
+        textarea.focus();
+
+        String input = "Testing Testing Testing Testing Testing Testing Testing Testing";
+        typeRunes(textarea, input);
+        textarea.view();
+
+        assertEquals(input, textarea.value(), "Wrapping should not change the stored value");
+    }
+
+    /**
+     * Setting a multi-line value must leave the cursor at the end of the last line,
+     * and setting a value again must reset the buffer.
+     * <p>
+     * Port of {@code TestSetValue} from {@code bubbles/textarea/textarea_test.go};
+     * the upstream {@code col} is the visual column of the cursor, exposed here as
+     * {@link Textarea.LineInfo#columnOffset()}.
+     */
+    @Test
+    void testSetValuePlacesCursorAtEnd() {
+        Textarea textarea = new Textarea();
+        textarea.setValue(String.join("\n", "Foo", "Bar", "Baz"));
+
+        assertEquals("Foo\nBar\nBaz", textarea.value());
+        assertEquals(2, textarea.line(), "Cursor should be on the last row after two newlines");
+        assertEquals(3, textarea.lineInfo().columnOffset(), "Cursor should be after the last character");
+
+        textarea.setValue("Test");
+
+        assertEquals("Test", textarea.value(), "SetValue should reset the text area");
+    }
+
+    /**
+     * Astral-plane characters must be inserted, stored, and measured as single
+     * characters of double width.
+     * <p>
+     * Port of {@code TestCanHandleEmoji} from {@code bubbles/textarea/textarea_test.go}.
+     */
+    @Test
+    void testCanHandleEmoji() {
+        Textarea textarea = new Textarea();
+        textarea.focus();
+
+        typeRunes(textarea, "🧋");
+        assertEquals("🧋", textarea.value(), "Expected emoji to be inserted");
+
+        textarea.setValue("🧋🧋🧋");
+
+        assertEquals("🧋🧋🧋", textarea.value(), "Expected emoji to be inserted");
+        assertEquals(3, textarea.lineInfo().columnOffset(), "Expected cursor to be on the third character");
+        assertEquals(6, textarea.lineInfo().charOffset(), "Expected cursor to be on the sixth cell");
+    }
+
+    /**
+     * Sends a string to the text area one code point at a time, as the input
+     * handler delivers rune key presses.
+     *
+     * @param textarea text area to update
+     * @param input text to type
+     */
+    private static void typeRunes(Textarea textarea, String input) {
+        int index = 0;
+        while (index < input.length()) {
+            char[] runes = Character.toChars(input.codePointAt(index));
+            textarea.update(new KeyPressMessage(new Key(KeyType.KeyRunes, runes)));
+            index += runes.length;
+        }
     }
 }
