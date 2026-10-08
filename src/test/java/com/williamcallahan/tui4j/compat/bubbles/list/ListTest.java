@@ -212,10 +212,60 @@ class ListTest {
         assertThat(list.index()).isZero();
     }
 
+    @Test
+    void testGoToEndSelectsTheLastItem() {
+        // Upstream sets the page to the last page and the cursor to the last item on
+        // it (`m.cursor = m.Paginator.ItemsOnPage(numItems) - 1`), so go-to-end
+        // always selects the last item (bubbles/list handleBrowsing).
+        List list = createPagedList(12);
+        assertThat(Command.isNone(list.nextPage())).isFalse();
+        applyCommand(list, list.select(0));
+        assertThat(list.index()).isZero();
+
+        applyMessage(list, new KeyPressMessage(new Key(KeyType.KeyEnd)));
+
+        assertThat(list.index()).isEqualTo(11);
+        assertThat(list.selectedItem().filterValue()).isEqualTo("item-11");
+    }
+
+    @Test
+    void testGoToStartSelectsTheFirstItemWhileOnTheFirstPage() {
+        // Upstream resets page and cursor unconditionally (`m.Paginator.Page = 0;
+        // m.cursor = 0`), so go-to-start moves the selection even when the list
+        // already shows the first page (bubbles/list handleBrowsing).
+        List list = createPagedList(12);
+        applyCommand(list, list.select(2));
+        assertThat(list.index()).isEqualTo(2);
+
+        applyMessage(list, new KeyPressMessage(new Key(KeyType.KeyHome)));
+
+        assertThat(list.index()).isZero();
+        assertThat(list.selectedItem().filterValue()).isEqualTo("item-0");
+    }
+
     private static List createList(Item... items) {
         List list = new List(items, new TestDelegate(), 10, 10);
         applyCommand(list, list.init());
         return list;
+    }
+
+    private static List createPagedList(int count) {
+        List list = createList(items(count));
+        applyCommand(list, list.setShowTitle(false));
+        list.setShowFilter(false);
+        list.setShowStatusBar(false);
+        list.setShowPagination(false);
+        applyCommand(list, list.setShowHelp(false));
+        applyCommand(list, list.refresh());
+        return list;
+    }
+
+    private static Item[] items(int count) {
+        Item[] items = new Item[count];
+        for (int i = 0; i < count; i++) {
+            items[i] = new TestItem("item-" + i);
+        }
+        return items;
     }
 
     private static void updateItems(List list, Item... items) {
