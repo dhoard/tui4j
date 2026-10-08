@@ -69,7 +69,24 @@ class StyleTest {
                 Arguments.of("maxWidth truncation with multiline text", "line1\nline22222\nline3", renderer.newStyle().maxWidth(5), "line1\nline2\nline3"),
                 Arguments.of("maxHeight with border", "line1\nline2\nline3", renderer.newStyle().maxHeight(1).borderDecoration(StandardBorder.NormalBorder), "┌─────┐"),
                 Arguments.of("maxHeight truncation with multiline", "line1\nline2\nline3\nline4\nline5", renderer.newStyle().maxHeight(3), "line1\nline2\nline3"),
-                Arguments.of("maxWidth with multiline and ellipsis", "line1_extra\nline2_extra\nline3_extra", renderer.newStyle().maxWidth(5).ellipsis(".."), "lin..\nlin..\nlin..")
+                Arguments.of("maxWidth with multiline and ellipsis", "line1_extra\nline2_extra\nline3_extra", renderer.newStyle().maxWidth(5).ellipsis(".."), "lin..\nlin..\nlin.."),
+                // A trailing newline owns a real final blank row: upstream splits with
+                // strings.Split, which keeps trailing empty lines (lipgloss Style.Render).
+                // The alignment property is set so that the style is not the zero style,
+                // which upstream returns unchanged.
+                Arguments.of("trailing newline", "foo\n", renderer.newStyle().align(Position.Left), "foo\n   "),
+                Arguments.of("double trailing newline", "foo\n\n", renderer.newStyle().align(Position.Left), "foo\n   \n   "),
+                Arguments.of("newline only", "\n", renderer.newStyle(), "\n"),
+                Arguments.of("width with trailing newline", "hello world\n", renderer.newStyle().width(5), "hello\nworld\n     "),
+                Arguments.of("padding with trailing newline", "foo\n", renderer.newStyle().padding(1), "     \n foo \n     \n     "),
+                Arguments.of("padding left with trailing newline", "foo\n", renderer.newStyle().paddingLeft(2), "  foo\n     "),
+                Arguments.of("padding and margin with trailing newline", "foo\n", renderer.newStyle().padding(1).margin(1),
+                        "       \n       \n  foo  \n       \n       \n       "),
+                Arguments.of("maxWidth with trailing newline", "hello\n", renderer.newStyle().maxWidth(3), "hel\n   "),
+                Arguments.of("maxHeight with trailing newline", "a\nb\n", renderer.newStyle().maxHeight(3), "a\nb\n "),
+                Arguments.of("maxHeight truncates the trailing newline", "a\nb\n", renderer.newStyle().maxHeight(2), "a\nb"),
+                Arguments.of("border with trailing newline", "foo\n", renderer.newStyle().borderDecoration(StandardBorder.NormalBorder),
+                        "┌───┐\n│foo│\n│   │\n└───┘")
         );
     }
 
