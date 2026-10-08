@@ -48,6 +48,12 @@ class StyleTest {
                 Arguments.of("margin left", "foo", renderer.newStyle().marginLeft(1), " foo"),
                 Arguments.of("empty text margin left", "", renderer.newStyle().marginLeft(1), " "),
                 Arguments.of("empty text margin right", "", renderer.newStyle().marginRight(1), " "),
+                // Top/bottom margin rows span the padded block width, including the
+                // left/right margins themselves (lipgloss applyMargins pads first).
+                Arguments.of("margin", "Hello, World!", renderer.newStyle().margin(1, 2, 3, 4),
+                        "                   \n    Hello, World!  \n                   \n                   \n                   "),
+                Arguments.of("padding and margin", "Foo", renderer.newStyle().padding(1).margin(1),
+                        "       \n       \n  Foo  \n       \n       "),
                 Arguments.of("color", "hello", renderer.newStyle().foreground(Color.color("#5A56E0")), "\u001B[38;2;90;86;224mhello\u001B[0m"),
                 Arguments.of("adaptive color", "hello", renderer.newStyle().foreground(new AdaptiveColor("#fffe12", "#5A56E0")), "\u001B[38;2;90;86;224mhello\u001B[0m"),
                 Arguments.of("bold", "hello", renderer.newStyle().bold(true), "\u001B[1mhello\u001B[0m"),
