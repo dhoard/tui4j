@@ -106,15 +106,17 @@ public record RGB(float r, float g, float b) {
     }
 
     /**
-     * Computes the HSLuv distance to another color.
+     * Computes the distance to another color in the HSLuv color space.
+     * <p>
+     * Upstream: {@code muesli/termenv} v0.15.2 {@code color.go} measures the
+     * distance with {@code lucasb-eyer/go-colorful} v1.2.0
+     * {@code Color.DistanceHSLuv}, which converts both colors to HSLuv first.
      *
      * @param other other color
      * @return distance value
      */
     public float distanceHSLuv(RGB other) {
-        HSL hsluv1 = toHSL();
-        HSL hsluv2 = other.toHSL();
-        return hsluv1.distance(hsluv2);
+        return (float) HSLuv.fromRgb(this).distanceTo(HSLuv.fromRgb(other));
     }
 
     /**
