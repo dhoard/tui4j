@@ -372,6 +372,19 @@ public class Tree implements Node {
     }
 
     /**
+     * Renders this tree to a string, matching upstream's {@code Tree.String()}, which every
+     * node type must provide because the upstream {@code Node} interface embeds
+     * {@code fmt.Stringer}.
+     * Lipgloss: tree/tree.go.
+     *
+     * @return rendered tree
+     */
+    @Override
+    public String toString() {
+        return render();
+    }
+
+    /**
      * Compatibility port of EnsureParentResult to preserve upstream behavior.
      * <p>
      * Lipgloss: tree/tree.go.
