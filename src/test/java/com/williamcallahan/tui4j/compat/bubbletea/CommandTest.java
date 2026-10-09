@@ -129,6 +129,20 @@ class CommandTest {
     }
 
     /**
+     * Verifies the paste command reads the system clipboard itself and yields a
+     * {@link PasteMessage} - or nothing when the clipboard is unavailable, which is what the
+     * build's {@code tui4j.clipboard.disabled=true} produces. Upstream bubbles reads the local
+     * clipboard inside {@code textinput.Paste}/{@code textarea.Paste} and returns the text as a
+     * paste message; the port previously emitted an unhandled request message instead, so the
+     * reply never arrived.
+     */
+    @Test
+    @DisplayName("Command.paste yields no message when the clipboard is unavailable")
+    void test_PasteCommandYieldsNoMessageWhenClipboardUnavailable() {
+        assertThat(Command.paste().execute()).isNull();
+    }
+
+    /**
      * Executes a command and returns its print line body.
      *
      * @param command command expected to produce a {@link PrintLineMessage}

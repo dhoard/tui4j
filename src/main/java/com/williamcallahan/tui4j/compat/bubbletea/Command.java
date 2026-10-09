@@ -1,5 +1,7 @@
 package com.williamcallahan.tui4j.compat.bubbletea;
 
+import com.williamcallahan.tui4j.term.Clipboard;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -293,15 +295,20 @@ public interface Command {
     }
 
     /**
-     * Requests clipboard contents from the terminal.
-     * The clipboard contents are delivered as a {@link PasteMessage}.
+     * Reads the system clipboard and delivers its contents as a {@link PasteMessage}.
      * <p>
-     * Bubble Tea: bubbletea/commands.go Paste
+     * Yields {@code null} when the clipboard is unavailable or reading is disabled with
+     * {@code tui4j.clipboard.disabled}. Mirrors upstream bubbles, whose paste commands read the
+     * local clipboard inside the command and hand the text back as a paste message
+     * ({@code textinput.Paste}/{@code textarea.Paste}).
      *
      * @return paste command
      */
     static Command paste() {
-        return ReadClipboardMessage::new;
+        return () -> {
+            String content = Clipboard.tryPaste();
+            return content == null ? null : new PasteMessage(content);
+        };
     }
 
     /**
