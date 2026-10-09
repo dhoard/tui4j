@@ -105,5 +105,39 @@ class CommandTest {
         assertThat(msg).isInstanceOf(BatchMessage.class);
         assertThat(((BatchMessage) msg).commands()).containsExactly(real);
     }
+
+    /**
+     * Verifies {@link Command#println} joins its arguments the way upstream does.
+     * <p>
+     * Upstream: github.com/charmbracelet/bubbletea/standard_renderer.go {@code Println} builds the
+     * body with {@code fmt.Sprint(args...)}, whose documented rule is "spaces are added between
+     * operands when neither is a string". Verified against Go 1.26: {@code fmt.Sprint("a","b")}
+     * is {@code "ab"}, {@code fmt.Sprint(1,2)} is {@code "1 2"}, {@code fmt.Sprint("a",1)} is
+     * {@code "a1"}, {@code fmt.Sprint(1,"b")} is {@code "1b"}, {@code fmt.Sprint("x",1,2)} is
+     * {@code "x1 2"}, and {@code fmt.Sprint()} is {@code ""}.
+     */
+    @Test
+    @DisplayName("Command.println joins arguments like fmt.Sprint")
+    void test_PrintlnJoinsArgumentsLikeFmtSprint() {
+        assertThat(printLineBody(Command.println("a", "b"))).isEqualTo("ab");
+        assertThat(printLineBody(Command.println(1, 2))).isEqualTo("1 2");
+        assertThat(printLineBody(Command.println("a", 1))).isEqualTo("a1");
+        assertThat(printLineBody(Command.println(1, "b"))).isEqualTo("1b");
+        assertThat(printLineBody(Command.println("x", 1, 2))).isEqualTo("x1 2");
+        assertThat(printLineBody(Command.println())).isEqualTo("");
+        assertThat(printLineBody(Command.println("hello"))).isEqualTo("hello");
+    }
+
+    /**
+     * Executes a command and returns its print line body.
+     *
+     * @param command command expected to produce a {@link PrintLineMessage}
+     * @return message body
+     */
+    private static String printLineBody(Command command) {
+        Message message = command.execute();
+        assertThat(message).isInstanceOf(PrintLineMessage.class);
+        return ((PrintLineMessage) message).messageBody();
+    }
 }
 
