@@ -306,14 +306,17 @@ public class Tree implements Node {
     }
 
     /**
-     * Updates the value.
+     * Sets the root value of this tree.
+     * <p>
+     * A node value adopts that node's root value and children, matching upstream, where
+     * {@code SetValue} delegates to {@code Root}.
+     * Lipgloss: tree/tree.go.
      *
-     * @param value value
-     * @return result
+     * @param value value to set
+     * @return this tree
      */
     public Tree setValue(Object value) {
-        setValue(String.valueOf(value));
-        return this;
+        return root(value);
     }
 
     /**
