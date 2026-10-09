@@ -175,8 +175,14 @@ public class Stopwatch implements Model {
         return Command.tick(interval, __ -> new TickMessage(id, tag));
     }
 
+    /**
+     * Upstream {@code stopwatch.Update} matches {@code msg.ID != m.id} strictly,
+     * with no unset-id sentinel (unlike the spinner's {@code ID > 0} and the
+     * timer's {@code ID != 0} guards), so broadcasting hand-built messages must
+     * not drive a stopwatch instance.
+     */
     private UpdateResult<Stopwatch> handleStartStop(int messageId, boolean shouldRun) {
-        if (messageId != 0 && messageId != id) {
+        if (messageId != id) {
             return UpdateResult.from(this);
         }
         running = shouldRun;
@@ -187,7 +193,7 @@ public class Stopwatch implements Model {
     }
 
     private UpdateResult<Stopwatch> handleReset(int messageId) {
-        if (messageId != 0 && messageId != id) {
+        if (messageId != id) {
             return UpdateResult.from(this);
         }
         elapsed = Duration.ZERO;
@@ -195,7 +201,7 @@ public class Stopwatch implements Model {
     }
 
     private UpdateResult<Stopwatch> handleTick(int messageId, int messageTag) {
-        if (!running || (messageId != 0 && messageId != id)) {
+        if (!running || messageId != id) {
             return UpdateResult.from(this);
         }
         if (messageTag > 0 && messageTag != tag) {
