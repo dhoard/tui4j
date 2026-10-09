@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class ProgressTest {
 
@@ -308,6 +309,46 @@ class ProgressTest {
                 "38;2;255;0;0", "38;2;251;71;0", "38;2;245;103;0", "38;2;236;130;0", "38;2;225;153;0");
         assertThat(cellColors(scaled.viewAs(0.5))).startsWith(
                 "38;2;255;0;0", "38;2;243;110;0", "38;2;218;164;0", "38;2;172;211;0", "38;2;0;255;0");
+    }
+
+    /**
+     * The animation must follow upstream harmonica's closed-form spring, not a
+     * naive Euler step: bubbles builds the spring with
+     * {@code harmonica.NewSpring(harmonica.FPS(60), 18.0, 1.0)}, so the first
+     * frame toward 1.0 lands at about 0.0369 (Euler overshoots to 0.09).
+     */
+    @Test
+    void testFrameFollowsUpstreamHarmonicaTrajectory() {
+        Progress progress = new Progress();
+        progress.setPercent(1.0);
+
+        progress.update(new FrameMessage(progress.id(), progress.tag()));
+
+        assertThat(progress.percentShown()).isCloseTo(0.036936310446821219, within(1e-6));
+    }
+
+    /**
+     * Upstream {@code IsAnimating} compares the signed velocity
+     * ({@code dist < 0.001 && velocity < 0.01}), so an under-damped spring stops
+     * when it crosses back within 0.001 of the target while moving downward,
+     * after 43 frames at 1.000621; taking the absolute value keeps animating
+     * until frame 47.
+     */
+    @Test
+    void testUnderDampedStopsOnTheUpstreamFrame() {
+        Progress progress = new Progress();
+        progress.setSpringOptions(18.0, 0.5);
+        progress.setPercent(1.0);
+
+        int frames = 0;
+        while (progress.isAnimating()) {
+            progress.update(new FrameMessage(progress.id(), progress.tag()));
+            frames++;
+            assertThat(frames).isLessThan(1000);
+        }
+
+        assertThat(frames).isEqualTo(43);
+        assertThat(progress.percentShown()).isCloseTo(1.0006214179649529, within(1e-6));
     }
 
     /**
