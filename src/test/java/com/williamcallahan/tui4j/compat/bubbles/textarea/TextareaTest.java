@@ -470,4 +470,22 @@ class TextareaTest {
             index += runes.length;
         }
     }
+
+    /**
+     * Verifies a bracketed-paste key inserts its text, the way upstream delivers pastes
+     * (a KeyMsg with the Paste flag whose runes the textarea inserts through
+     * insertRunesFromUserInput).
+     */
+    @Test
+    void testPasteKeyInsertsPastedText() {
+        Textarea textarea = new Textarea();
+        textarea.setWidth(80);
+        textarea.setHeight(10);
+        textarea.focus();
+
+        textarea.update(new KeyPressMessage(
+            new Key(KeyType.KeyRunes, "hi there".toCharArray(), false, true)));
+
+        assertEquals("hi there", textarea.value(), "A paste key should insert its text");
+    }
 }
